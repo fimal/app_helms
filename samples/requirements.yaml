@@ -1,0 +1,16 @@
+dependencies:
+  - name: waas-sample-bwapp-inline
+    version: 0.1.0
+    repository: "file://./charts/sample-bwapp-inline"
+    tags: 
+      - bwapp
+  - name: waas-sample-app-httpbin-inline
+    version: 0.1.0
+    repository: "file://./charts/sample-app-httpbin-inline"
+    tags: 
+      - httpbin
+  - name: waas-sample-app1-inline
+    version: 0.1.0
+    repository: "file://./charts/sample-app1-inline"
+    tags: 
+      - app1

@@ -1,0 +1,23 @@
+image:
+  registry:
+  version:
+enabled: true
+nodePort: 9
+replicaCount: 1
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+## settings for specific containers
+containers:
+  enforcer:
+    registry:
+    version:
+  logrotate:
+    registry:
+    version:
+  fluentbit:
+    registry:
+    version:
+    resources: 
+      {}

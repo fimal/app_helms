@@ -1,0 +1,26 @@
+{{- if not .Values.global.apiMode  }}
+{{- if .Values.enabled }}
+apiVersion: waas.radware.com/v1beta1
+kind: Profile
+metadata:
+  name:  {{ .Values.global.namesPrefix }}sample-app-httpbin-profile
+  labels:
+    {{- include "samples.labels" . | indent 4 }}
+    release: {{ .Release.Name }}
+spec:
+  policies:
+  - name: httpbinPolicy
+    operatorEmail: support@radware.com
+    protections:
+    - id: protection1
+      signatures:
+        opMode: Active
+    classifiers:
+    - protectionId: protection1
+      hostname: '*'
+      id: classifier1
+      path:
+        operand: Prefix
+        value: /
+{{- end }}
+{{- end }}

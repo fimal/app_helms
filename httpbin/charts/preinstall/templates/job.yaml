@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.global.namesPrefix }}preinstall-job
+  labels:
+    {{- include "httpbin.labels" . | indent 4 }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": "pre-install"
+  {{- if .Values.global.preserveJobs }}
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+  {{- else }}
+    "helm.sh/hook-delete-policy": "hook-succeeded,before-hook-creation"
+  {{- end }}
+    "helm.sh/hook-weight": "4"
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: {{ .Values.global.namesPrefix }}preinstall-service-account
+      restartPolicy: Never
+      containers:
+        - name: preinstall
+          image: {{ include "httpbin.image.registry" . | coalesce .Values.containers.preinstall.registry }}/waas-kubectl{{ include "httpbin.image.version" . | coalesce .Values.containers.preinstall.version }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          env:
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: KWAFNAMESPACE
+              value: {{ .Values.global.kwafns }}            
+            - name: NAMES_PREFIX
+              value: {{ .Values.global.namesPrefix }}
+          command: ["/bin/bash"]
+          args:
+            - "-c"
+            - |-
+{{ .Files.Get "files/pre-install.sh" | indent 14 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

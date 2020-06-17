@@ -1,0 +1,91 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.namesPrefix }}bwapp-deployment
+  labels:
+    {{- include "samples.labels" . | indent 8 }}
+spec:
+  selector:
+    matchLabels:
+      configid: {{ .Values.global.namesPrefix }}bwapp-container
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      labels:
+        configid: {{ .Values.global.namesPrefix }}bwapp-container
+        {{- include "samples.labels" . | indent 8}}
+    spec:
+      shareProcessNamespace: true
+      containers:
+        - name: bwapp-app
+          image: feltsecure/owasp-bwapp
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+        - name: enforcer
+          ports:
+            - name: stats
+              containerPort: 19010
+          image: {{ include "samples.image.registry" . | coalesce .Values.containers.enforcer.registry }}/waas-bootstrap{{ include "samples.image.version" . | coalesce .Values.containers.enforcer.version }}
+          command:
+            - "/wrapper.sh"
+            - "-m={{ .Values.global.namesPrefix }}controller-service"
+            - "-n={{ .Values.global.kwafns }}"
+            - "-p={{ .Release.Namespace }}/{{ .Values.global.namesPrefix }}bwapp-profile"
+            - "-t=bwapp-helm"
+            - "-e"
+            - "-c=9000:bwappPolicy:127.0.0.1:80"
+            - "-l=$HOSTNAME_access.log"
+            - "-f=$HOSTNAME_security.log"
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          env:
+            - name: ENFORCER_OPT_L
+              value: info
+            - name: ENFORCER_OPT_BASE_ID
+              value: "322"
+          volumeMounts:
+            - mountPath: /logs
+              name: logs-volume
+{{- if .Values.includeProbes }}
+          readinessProbe:
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+            httpGet:
+              path: /install.php?install=yes
+              port: 9000
+              scheme: HTTP
+          livenessProbe:
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+            httpGet:
+              path: /install.php?install=yes
+              port: 9000
+              scheme: HTTP
+{{- end }}
+        - name: logrotate
+          image: {{ include "samples.image.registry" . | coalesce .Values.containers.logrotate.registry }}/waas-logrotate{{ include "samples.image.version" . | coalesce .Values.containers.logrotate.version }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          env:
+            - name: PROCESS_TO_SIGNAL
+              value: bwapp_enforcer
+          volumeMounts:
+            - name: logs-volume
+              mountPath: /logs
+        {{- include "samples.fluent-bit-container" . | indent 8 }}
+      volumes:
+        {{- include "samples.fluent-bit-volumes" . | indent 6 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+

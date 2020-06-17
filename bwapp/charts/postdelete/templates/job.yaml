@@ -1,0 +1,52 @@
+{{- if .Values.global.deleteCertificate}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.global.namesPrefix }}postdelete-job
+  labels:
+    {{- include "bwapp.labels" . | indent 4 }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": "post-delete"
+  {{- if .Values.global.preserveJobs }}
+    "helm.sh/hook-delete-policy": "before-hook-creation"  
+  {{- else }}
+    "helm.sh/hook-delete-policy": "hook-succeeded,before-hook-creation"
+  {{- end }}
+    "helm.sh/hook-weight": "4"
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: {{ .Values.global.namesPrefix }}postdelete-service-account
+      restartPolicy: Never
+      containers:
+        - name: postdelete
+          image: {{ include "bwapp.image.registry" . | coalesce .Values.containers.postdelete.registry }}/waas-kubectl{{ include "bwapp.image.version" . | coalesce .Values.containers.postdelete.version }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          env:
+            - name: NAMES_PREFIX
+              value: {{ .Values.global.namesPrefix }}
+            - name: RELEASE
+              value: {{ .Release.Name }}
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}        
+          command: ["/bin/bash"]
+          args:
+            - "-c"
+            - |-
+{{ .Files.Get "files/post-delete.sh" | indent 14 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+

@@ -1,0 +1,31 @@
+
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.namesPrefix }}bwapp-service
+  labels:
+    {{ .Values.global.namesPrefix }}prometheus-service: monitor
+    {{- include "bwapp.labels" . | indent 4 }}
+spec:
+  selector:
+    configid: {{ .Values.global.namesPrefix }}bwapp-container
+  {{- include "bwapp.serviceTypeExposed" . }}
+  ports:
+    - port: 80
+      targetPort: 9000
+      name: http
+      protocol: TCP
+      {{ include "bwapp.nodeport" . }}
+    - port: 8080
+      targetPort: 19010
+      protocol: TCP
+      name: stats
+      {{ include "bwapp.nodeport" (dict "Values" .Values "Extra" "0") }}
+    - port: 2020
+      targetPort: 2020
+      protocol: TCP
+      name: fb-stats
+      {{ include "bwapp.nodeport" (dict "Values" .Values "Extra" "1") }}
+{{- end }}
+

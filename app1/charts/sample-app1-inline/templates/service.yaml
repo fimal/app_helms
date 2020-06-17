@@ -1,0 +1,29 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.namesPrefix }}sample-app1-service
+  labels:
+    {{ .Values.global.namesPrefix }}prometheus-service: monitor
+    {{- include "app1.labels" . | indent 4 }}
+spec:
+  selector:
+    configid: {{ .Values.global.namesPrefix }}sample-app1-container
+  {{- include "app1.serviceTypeExposed" . }}
+  ports:
+    - port: 80
+      targetPort: 9000
+      name: http
+      protocol: TCP
+      {{ include "app1.nodeport" . }}
+    - port: 8080
+      targetPort: 19010
+      protocol: TCP
+      name: stats
+      {{ include "app1.nodeport" (dict "Values" .Values "Extra" "0") }}
+    - port: 2020
+      targetPort: 2020
+      protocol: TCP
+      name: fb-stats
+      {{ include "app1.nodeport" (dict "Values" .Values "Extra" "1") }}
+{{- end }}

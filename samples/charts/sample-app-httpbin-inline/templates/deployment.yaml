@@ -1,0 +1,93 @@
+{{- if not .Values.global.apiMode  }}
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.namesPrefix }}sample-app-httpbin-deployment
+  labels:
+    {{- include "samples.labels" . | indent 4 }}
+spec:
+  selector:
+    matchLabels:
+      configid: {{ .Values.global.namesPrefix }}sample-app-httpbin-container
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      labels:
+        configid: {{ .Values.global.namesPrefix }}sample-app-httpbin-container
+        {{- include "samples.labels" . | indent 8}}
+    spec:
+      shareProcessNamespace: true
+      containers:
+        - name: sample-app-httpbin
+          image: kennethreitz/httpbin:latest
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          command: ["gunicorn", "-b", "127.0.0.1:8080", "httpbin:app", "-k", "gevent"]
+        - name: enforcer
+          ports:
+            - name: stats
+              containerPort: 19010
+          image: {{ include "samples.image.registry" . | coalesce .Values.containers.enforcer.registry }}/waas-bootstrap{{ include "samples.image.version" . | coalesce .Values.containers.enforcer.version }}
+          command:
+            - "/wrapper.sh"
+            - "-m={{ .Values.global.namesPrefix }}controller-service"
+            - "-p={{ .Release.Namespace }}/{{ .Values.global.namesPrefix }}sample-app-httpbin-profile"
+            - "-n={{ .Values.global.kwafns }}"            
+            - "-t=app-httpbin"
+            - "-e"
+            - "-c=9000:httpbinPolicy:127.0.0.1:8080"
+            - "-l=$HOSTNAME_access.log"
+            - "-f=$HOSTNAME_security.log"
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          env:
+            - name: ENFORCER_OPT_L
+              value: info
+            - name: ENFORCER_OPT_BASE_ID
+              value: "323"
+          volumeMounts:
+            - mountPath: /logs
+              name: logs-volume
+          readinessProbe:
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+            httpGet:
+              path: /
+              port: 9000
+              scheme: HTTP
+          livenessProbe:
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+            httpGet:
+              path: /
+              port: 9000
+              scheme: HTTP
+        - name: logrotate
+          image: {{ include "samples.image.registry" . | coalesce .Values.containers.logrotate.registry }}/waas-logrotate{{ include "samples.image.version" . | coalesce .Values.containers.logrotate.version }}
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          env:
+            - name: PROCESS_TO_SIGNAL
+              value: waas_enforcer
+          volumeMounts:
+            - name: logs-volume
+              mountPath: /logs
+        {{- include "samples.fluent-bit-container" . | indent 8 }}
+      volumes:
+        {{- include "samples.fluent-bit-volumes" . | indent 6 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+
+{{- end }}
+{{- end }}
